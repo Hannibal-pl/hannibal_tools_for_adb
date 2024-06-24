@@ -9,35 +9,35 @@ $mode = MODE_NONE;
 
 $packages = array();
 //ripped earlyer as it need to add more data to draw it properly
-$packages[] = array('name' => '18 PIN POWER',     'count' => 0, 'pins' =>  18);
-$packages[] = array('name' => '32 PIN DIAG',      'count' => 0, 'pins' =>  32);
-$packages[] = array('name' => '50 PIN CONN',      'count' => 0, 'pins' =>  50);
-$packages[] = array('name' => '96 PIN CONN',      'count' => 0, 'pins' =>  96);
-$packages[] = array('name' => '100 PIN EDGE',     'count' => 0, 'pins' => 100);
-$packages[] = array('name' => 'CONN RECPT 9D',    'count' => 0, 'pins' =>  11);
-$packages[] = array('name' => 'CONN RECPT 25D',   'count' => 0, 'pins' =>  27);
-$packages[] = array('name' => 'SIP10 (062)',      'count' => 0, 'pins' =>  10);
-$packages[] = array('name' => '14 DIP',           'count' => 0, 'pins' =>  14);
-$packages[] = array('name' => '16 DIP',           'count' => 0, 'pins' =>  16);
-$packages[] = array('name' => '18 DIP',           'count' => 0, 'pins' =>  18);
-$packages[] = array('name' => '20 DIP',           'count' => 0, 'pins' =>  20);
-$packages[] = array('name' => '24 DIP',           'count' => 0, 'pins' =>  24);
-$packages[] = array('name' => '28 DIP',           'count' => 0, 'pins' =>  28);
-$packages[] = array('name' => '48 DIP',           'count' => 0, 'pins' =>  48);
-$packages[] = array('name' => '64 DIP',           'count' => 0, 'pins' =>  64);
-$packages[] = array('name' => '24 SDIP',          'count' => 0, 'pins' =>  24);
-$packages[] = array('name' => 'RES (075) 450',    'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'RES (075) 500',    'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'RES (100) 700',    'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'DIODE (075) 600',  'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'AXL CAP (062)300', 'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'BYPASS CAP',       'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'LED',              'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'JPAD',             'count' => 0, 'pins' =>   2);
-$packages[] = array('name' => 'TO-18 (075)',      'count' => 0, 'pins' =>   3);
-$packages[] = array('name' => 'CRYSTAL OSC-4',    'count' => 0, 'pins' =>   4);
-$packages[] = array('name' => 'BATT PINS',        'count' => 0, 'pins' =>   3);
-$packages[] = array('name' => 'RSTIFF SHAPE',     'count' => 0, 'pins' =>  13);
+$packages[] = array('name' => '18 PIN POWER',     'count' => 0, 'pins' =>  18, 'draw' => 'draw_con18');
+$packages[] = array('name' => '32 PIN DIAG',      'count' => 0, 'pins' =>  32, 'draw' => 'draw_con32');
+$packages[] = array('name' => '50 PIN CONN',      'count' => 0, 'pins' =>  50, 'draw' => 'draw_con50');
+$packages[] = array('name' => '96 PIN CONN',      'count' => 0, 'pins' =>  96, 'draw' => 'draw_con96');
+$packages[] = array('name' => '100 PIN EDGE',     'count' => 0, 'pins' => 100, 'draw' => 'draw_con100');
+$packages[] = array('name' => 'CONN RECPT 9D',    'count' => 0, 'pins' =>  11, 'draw' => 'draw_con9d');
+$packages[] = array('name' => 'CONN RECPT 25D',   'count' => 0, 'pins' =>  27, 'draw' => 'draw_con25d');
+$packages[] = array('name' => 'SIP10 (062)',      'count' => 0, 'pins' =>  10, 'draw' => 'draw_sip10');
+$packages[] = array('name' => '14 DIP',           'count' => 0, 'pins' =>  14, 'draw' => 'draw_dip14');
+$packages[] = array('name' => '16 DIP',           'count' => 0, 'pins' =>  16, 'draw' => 'draw_dip16');
+$packages[] = array('name' => '18 DIP',           'count' => 0, 'pins' =>  18, 'draw' => 'draw_dip18');
+$packages[] = array('name' => '20 DIP',           'count' => 0, 'pins' =>  20, 'draw' => 'draw_dip20');
+$packages[] = array('name' => '24 DIP',           'count' => 0, 'pins' =>  24, 'draw' => 'draw_dip24');
+$packages[] = array('name' => '28 DIP',           'count' => 0, 'pins' =>  28, 'draw' => 'draw_dip28');
+$packages[] = array('name' => '48 DIP',           'count' => 0, 'pins' =>  48, 'draw' => 'draw_dip48');
+$packages[] = array('name' => '64 DIP',           'count' => 0, 'pins' =>  64, 'draw' => 'draw_dip64');
+$packages[] = array('name' => '24 SDIP',          'count' => 0, 'pins' =>  24, 'draw' => 'draw_sdip24');
+$packages[] = array('name' => 'RES (075) 450',    'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'RES (075) 500',    'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'RES (100) 700',    'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'DIODE (075) 600',  'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'AXL CAP (062)300', 'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'BYPASS CAP',       'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'LED',              'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'JPAD',             'count' => 0, 'pins' =>   2, 'draw' => 'draw_default');
+$packages[] = array('name' => 'TO-18 (075)',      'count' => 0, 'pins' =>   3, 'draw' => 'draw_default');
+$packages[] = array('name' => 'CRYSTAL OSC-4',    'count' => 0, 'pins' =>   4, 'draw' => 'draw_default');
+$packages[] = array('name' => 'BATT PINS',        'count' => 0, 'pins' =>   3, 'draw' => 'draw_default');
+$packages[] = array('name' => 'RSTIFF SHAPE',     'count' => 0, 'pins' =>  13, 'draw' => 'draw_default');
 
 
 $parts = array();
@@ -72,12 +72,17 @@ while(!feof($cadfile)) {
 	}
 }
 
-
 fclose($cadfile);
 
-print_r($packages);
-print_r($parts);
-print_r($nets);
+print("<svg viewBox=\"-2000 0 34000 10000\" width=\"24000\" height=\"10000\" xmlns=\"http://www.w3.org/2000/svg\">\n");
+foreach($parts as $p) {
+	print($packages[$p['pkg']]['draw']($p));
+}
+print("</svg>\n");
+
+//print_r($packages);
+//print_r($parts);
+//print_r($nets);
 
 function parse_none($line) {
 	global $mode;
@@ -200,14 +205,15 @@ function parse_positions($line) {
 
 	$p = get_part($part);
 	$parts[$p]['x'] = $pos_x;
-	$parts[$p]['y'] = $pos_y;
+	$parts[$p]['y'] = $pos_y - 12600;
 
 }
 
 function add_part($part, $package, $title) {
 	global $parts;
 
-	array_push($parts, array('part' => $part, 'title' => $title, 'pkg' => get_package($package), 'pins' => array()));
+	$id = array_push($parts, array('part' => $part, 'title' => $title, 'pkg' => get_package($package), 'pins' => array())) - 1;
+	$parts[$id]['id'] = $id;
 }
 
 
@@ -220,7 +226,7 @@ function get_package($pkg) {
 		}
 	}
 
-	return array_push($packages, array('name' => $pkg, 'count' => 1, 'pins' => 0)) - 1;
+	return array_push($packages, array('name' => $pkg, 'count' => 1, 'pins' => 0, 'draw' => 'draw_default')) - 1;
 }
 
 function get_part($part) {
@@ -263,5 +269,134 @@ function fix_number($number) {
 		return intval($number);
 	}
 }
+
+//drawing functions
+
+function draw_default($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 30 v -30 h -30 v 30 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_con18($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -540 h -60 v 540 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_con32($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -960 h -60 v 960 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_con50($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -1500 h -60 v 1500 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_con96($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -2880 h -60 v 2880 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_con100($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -3000 h -60 v 3000 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_con9d($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -150 h -60 v 150 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_con25d($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -390 h -60 v 390 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_sip10($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 30 v -300 h -30 v 300 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip14($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -210 h -90 v 210 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip16($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -240 h -90 v 240 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip18($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -270 h -90 v 270 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip20($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -300 h -90 v 300 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip24($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -360 h -90 v 360 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip28($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -420 h -90 v 420 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip48($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 180 v -720 h -180 v 720 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_dip64($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 180 v -960 h -180 v 960 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
+function draw_sdip24($data) {
+	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
+	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -252 h -90 v 252 \" />\n";
+	$ret .= "\t</g>\n";
+	return $ret;
+}
+
 
 ?>
