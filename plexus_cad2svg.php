@@ -291,6 +291,7 @@ function fix_number($number) {
 function draw_default($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 30 v -30 h -30 v 30 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 20pt; fill: green;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -298,6 +299,7 @@ function draw_default($data) {
 function draw_con18($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -540 h -60 v 540 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -305,6 +307,7 @@ function draw_con18($data) {
 function draw_con32($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -960 h -60 v 960 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -312,6 +315,7 @@ function draw_con32($data) {
 function draw_con50($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -1500 h -60 v 1500 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -319,6 +323,7 @@ function draw_con50($data) {
 function draw_con96($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -2880 h -60 v 2880 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -326,6 +331,7 @@ function draw_con96($data) {
 function draw_con100($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -3000 h -60 v 3000 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -333,6 +339,7 @@ function draw_con100($data) {
 function draw_con9d($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -150 h -60 v 150 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -340,6 +347,7 @@ function draw_con9d($data) {
 function draw_con25d($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 60 v -390 h -60 v 390 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -347,6 +355,7 @@ function draw_con25d($data) {
 function draw_sip10($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 30 v -300 h -30 v 300 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 20)."\" y=\"".($data['y'] + 20)."\" style=\"font-size: 30pt; fill: blue;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -354,6 +363,7 @@ function draw_sip10($data) {
 function draw_dip14($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -210 h -90 v 210 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -361,6 +371,7 @@ function draw_dip14($data) {
 function draw_dip16($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -240 h -90 v 240 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -368,6 +379,7 @@ function draw_dip16($data) {
 function draw_dip18($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -270 h -90 v 270 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -375,6 +387,7 @@ function draw_dip18($data) {
 function draw_dip20($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -300 h -90 v 300 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -382,6 +395,7 @@ function draw_dip20($data) {
 function draw_dip24($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -360 h -90 v 360 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -389,6 +403,7 @@ function draw_dip24($data) {
 function draw_dip28($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -420 h -90 v 420 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -396,6 +411,7 @@ function draw_dip28($data) {
 function draw_dip48($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 180 v -720 h -180 v 720 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -403,6 +419,7 @@ function draw_dip48($data) {
 function draw_dip64($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 180 v -960 h -180 v 960 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
@@ -410,6 +427,7 @@ function draw_dip64($data) {
 function draw_sdip24($data) {
 	$ret  = "\t<g class=\"part_".$data['id']."\">\n";
 	$ret .= "\t\t<path d=\"M ".$data['x']." ".$data['y']." h 90 v -252 h -90 v 252 \" />\n";
+	$ret .= "\t\t<text x=\"".($data['x'] + 30)."\" y=\"".($data['y'] + 30)."\" style=\"font-size: 30pt; fill: red;\">".$data['part']." (".$data['title'].")</text>\n";
 	$ret .= "\t</g>\n";
 	return $ret;
 }
