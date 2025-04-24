@@ -20,8 +20,10 @@ PERFORMANCE OF THIS SOFTWARE.
 #include <libgen.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <stdint.h>
 
 unsigned remap[16][256];
+uint16_t controlSum = 0;
 
 void createRemap(unsigned remap[256], char map[9]) {
 	for (unsigned i = 0; i <= 255; i++) {
@@ -68,7 +70,7 @@ int main(int argc, char *argv[]) {
 	unsigned char *mem_lo = malloc(size);
 	unsigned char *mem = malloc(size * 2);
 	if (!mem_hi || !mem_lo) {
-		fprintf(stderr, "No enough memory.\n");
+		fprintf(stderr, "Not enough memory.\n");
 		fclose(lo);
 		fclose(hi);
 		return -1;
@@ -108,6 +110,16 @@ int main(int argc, char *argv[]) {
 	for (unsigned i = 0; i < size; i++) {
 		mem[i * 2]     = mem_lo[(i & 0xFFFFFF00) + remap[(i & 0xF0) >> 4][i & 0xFF]];
 		mem[i * 2 + 1] = mem_hi[(i & 0xFFFFFF00) + remap[(i & 0xF0) >> 4][i & 0xFF]];
+	}
+
+	for (unsigned i = 0; i < 0xFFFE; i++) {
+		controlSum += (uint16_t)mem[i];
+	}
+	controlSum = ((controlSum & 0xFF00) >> 8) | ((controlSum & 0x00FF) << 8);
+	if (controlSum == *(uint16_t *)&mem[0xFFFE]) {
+		fprintf(stderr, "Control Sum OK.\n");
+	} else {
+		fprintf(stderr, "Control Sum Failed.\n");
 	}
 
 	fwrite(mem, size * 2, 1, stdout);
