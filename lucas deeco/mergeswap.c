@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 	unsigned char *mem_hi = malloc(size);
 	unsigned char *mem_lo = malloc(size);
 	unsigned char *mem = malloc(size * 2);
-	if (!mem_hi || !mem_lo) {
+	if (!mem_hi || !mem_lo || !mem) {
 		fprintf(stderr, "Not enough memory.\n");
 		fclose(lo);
 		fclose(hi);
