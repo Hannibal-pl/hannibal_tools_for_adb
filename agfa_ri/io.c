@@ -1,12 +1,23 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "io.h"
 
 // forward declarations
+void poolUarts(void);
+uint32_t waitForRSSH(void);
+void executeAtpLAndS(void);
+void apisWriteCommand(char *command);
+void illegalMsg(void);
+uint32_t getTwoByteInt(uint8_t *data);
+void setLed(uint32_t led_map);
 uint32_t uartInputIsDebug(void);
+uint32_t uartInputGetDial(void);
 void sysMain(void);
 void clearSerialBuffer(SERIAL_BUFFER *buf);
+uint32_t getFullBuffer(PARSER_HELPER *helper);
 void uartPuts(UART_TRANSFER *uart, char *string);
+void incBufferReadIndex(uint32_t serial_type);
 void debugPuts(char *string);
 void initParserHelper(uint32_t type, SERIAL_BUFFER *buffer, PARSER_HELPER *helper);
 void readByteApis(void);
@@ -20,8 +31,20 @@ void asm_memcpy(uint8_t *dest, uint8_t *src, uint32_t len);
 
 // uninitialized globals
 
+// $15000 helper structure for APIS/ATP commands
+PARSER_HELPER parser_helper;
 // $1500E ATP status flags
-uint32_t atp_status;
+uint32_t atp_mode;
+// $15016 command APIS/ATP code
+uint32_t command_code;
+// $1501A optional APIS command param
+uint32_t command_param;
+// $15022 ???
+uint32_t led_3_toggle;
+// $15032 buffer for error string
+char error_buffer[64];
+// $150F2 buffer for !L&S ATP command
+char las_buffer[32];
 // $15112 0 if data segment is initialized ???
 uint32_t is_loaded;
 // $15116 whether debug mode is ON
@@ -33,9 +56,9 @@ UART_TRANSFER *uart_atp;
 // $15122 debug UART memory mapping
 UART_TRANSFER *uart_debug;
 // $15126 serial buffers for APIS UART
-SERIAL_BUFFER apis_buffers[4];
+SERIAL_BUFFER apis_buffers[SERIAL_BUFFER_COUNT];
 // $15256 serial buffers for ATP UART
-SERIAL_BUFFER atp_buffers[4];
+SERIAL_BUFFER atp_buffers[SERIAL_BUFFER_COUNT];
 // #15386 circural buffer indexes for APIS UART
 SERIAL_BUFFER_INDEX apis_buffer_index;
 // #1538E circural buffer indexes for ATP UART
@@ -52,6 +75,13 @@ uint32_t is_sig_test;
 // $153F2 in sig test ordered
 uint32_t is_sig_test_ordered;
 #warning variable meaing not fully understood 'is_sig_test_ordered'
+
+// $171Ac
+char *atp_commands[COMMAND_COUNT_ATP] = { "!STA", "!L&S", "!BEG", "!END", "!PWR", "_GST", "_CMD", "_INF", "_SET", "_GET", "_MOD", "_NEG", "_POS", "_GPR", "_RES"};
+// $17242
+char *apis_commands[COMMAND_COUNT_APIS] = { "RE", "PA", "DN", "MG", "SH" };
+// 172E0
+UART_CONFIG *uart1_config = UART1_CFG;
 
 
 // $0400
@@ -84,25 +114,211 @@ void cmdATI() {
 #warning TODO
 }
 
+// $04B4
+uint32_t doApisReset(void) {
+	uint32_t i;
+
+	atp_mode = ATP_MODE_BOOTING;
+	setLed(LED_2_3);
+
+	apisWriteCommand("SS");
+	if (!waitForRSSH()) {
+		return 0;
+	}
+
+	command_code = -1;
+	for (i = 0; i <= 5; i++) {
+		apisWriteCommand("RE");
+		poolUarts();
+		if (command_code != CMD_APIS_RSRE) {
+			continue;
+		}
+	}
+	if (i > 5) {
+		return 0;
+	}
+	setLed(LED_1_2_3);
+
+	while(command_code != CMD_APIS_RSMG) {
+		poolUarts();
+	}
+	setLed(LED_1_2);
+
+	if (command_param == 1) {
+		return 0;
+	}
+
+	atp_mode = ATP_MODE_IDLE;
+	return 1;
+}
+
 // $0B4E
-void atpWriteStatus(void) {
-	switch (atp_status) {
-		case ATP_STATUS_IDLE:
+void atpWriteMode(void) {
+	switch (atp_mode) {
+		case ATP_MODE_IDLE:
 			uartPuts(UART_ATP, "0005+idle");
 			break;
-		case ATP_STATUS_IMAGING:
+		case ATP_MODE_IMAGING:
 			uartPuts(UART_ATP, "0008+imaging");
 			break;
-		case ATP_STATUS_BOOTING:
+		case ATP_MODE_BOOTING:
 			uartPuts(UART_ATP, "0008+booting");
 			break;
-		case ATP_STATUS_BOOT_FAILED:
+		case ATP_MODE_BOOT_FAILED:
 			uartPuts(UART_ATP, "0012+boot failed");
 			break;
-		case ATP_STATUS_SIG_TEST:
+		case ATP_MODE_SIG_TEST:
 			uartPuts(UART_ATP, "0008+SIGtest");
 			break;
 	}
+}
+
+// $0BB2
+void poolUarts(void) {
+	uint32_t i;
+	// loop until full command is fetched
+start:	while(!getFullBuffer(&parser_helper));
+
+	if (parser_helper.type == SERIAL_TYPE_APIS) {
+		// match common part
+		if (strncmp(parser_helper.data, "{RS", 3) == 0) {
+			for (i = 0; i < COMMAND_COUNT_APIS; i++) {
+				// match specific part
+				if (strncmp(parser_helper.data + 3, apis_commands[i], 3) == 0) {
+					// recreate APIS command code
+					command_code = CMD_APIS_BASE + i;
+					// fetch param if needed
+					if ((command_code == CMD_APIS_RSSH) || (command_code == CMD_APIS_RSMG)) {
+						command_param = getTwoByteInt(parser_helper.data + 5);
+					}
+					break;
+				}
+			}
+			if (i >= COMMAND_COUNT_APIS) {
+				illegalMsg();
+			}
+		} else {
+			illegalMsg();
+		}
+
+		incBufferReadIndex(SERIAL_TYPE_APIS);
+	} else if (parser_helper.type == SERIAL_TYPE_ATP) {
+		for (i = 0; i < COMMAND_COUNT_ATP + 1; i++) {
+			// POSSIBLE CRITICAL BUG
+			// loop over 16 values but in table is only 15 !
+			if (strncmp(parser_helper.data, atp_commands[i], 4) == 0) {
+				// recreate ATP command code
+				command_code = i;
+				break;
+			}
+		}
+		if (i >= COMMAND_COUNT_ATP + 1) {
+			illegalMsg();
+		}
+
+		if (command_code == CMD_ATP_MOD) {
+			atpWriteMode();
+			incBufferReadIndex(SERIAL_TYPE_ATP);
+			// I have no idea how achieve this in clean way without goto
+			goto start;
+		} else if (command_code == CMD_ATP_LaS) {
+			executeAtpLAndS();
+		}
+
+		incBufferReadIndex(SERIAL_TYPE_ATP);
+	} else {
+		debugPuts("ATIacti - Unknown device");
+	}
+}
+
+// $0D6C
+uint32_t waitForRSSH(void) {
+	uint32_t i;
+
+	poolUarts();
+	for (i = 0; i <= 5; i++) {
+		if (command_code == CMD_APIS_RSSH) {
+			break;
+		}
+		poolUarts();
+	}
+
+	if (i > 5) {
+		sprintf(error_buffer, "SH timed out");
+		debugPuts(error_buffer);
+		return 0;
+	}
+
+	return 1;
+}
+
+// $0E4C
+void apisWriteCommand(char *command) {
+	char buf[64];
+
+	sprintf(buf, "{SR%s", command);
+	uartPuts(UART_APIS, buf);
+}
+
+// $0EAA
+void illegalMsg(void) {
+	command_code = -1;
+	command_param = -1;
+	sprintf(error_buffer, "Illegal msg : %s", parser_helper.data);
+	debugPuts(error_buffer);
+}
+
+// $0F84
+uint32_t getTwoByteInt(uint8_t *data) {
+	return (data[0] - '0') * 10 + (data[1] = '0');
+}
+
+// $1014
+// POSSIBLE BUG
+// This function is called by poolUarts() and can also call indirectly poolUarts() witch can cause
+// probably undesirable recurrency causing stack overflow
+void executeAtpLAndS(void) {
+	uint32_t led = LED_NO_LED;
+	uint8_t ch;
+
+	switch (parser_helper.data[10]) {
+		case '0':
+			if (led_3_toggle) {
+				led = LED_3;
+				led_3_toggle = 0;
+			} else {
+				led = LED_NO_LED;
+				led_3_toggle = 1;
+			}
+			break;
+		case '1':
+			led = LED_1_2_3;
+			break;
+		case '3':
+			led = LED_2_3;
+			break;
+	}
+
+	if (parser_helper.data[5] == 'W') {
+		led = LED_3;
+	}
+
+	if (parser_helper.data[6] == 'H') {
+		led = LED_1;
+	}
+
+	setLed(led);
+	strcpy(las_buffer, "0004+");
+#warning TODO
+
+	ch = uartInputGetDial() + '0';
+	if (ch == '0') {
+		ch = '6';
+	}
+	las_buffer[6] = ch;
+	las_buffer[7] = ch + 0x20;
+	las_buffer[8] = 0;
+	uartPuts(UART_ATP, las_buffer);
 }
 
 // $1116
@@ -195,25 +411,24 @@ uint32_t uartWriteByte(UART_TRANSFER *uart, uint8_t buffer) {
 // $123E
 void setLed(uint32_t led_map) {
 	uint8_t led_mask;
-	UART_CONFIG *uart = UART1_CFG;
 
 	switch (led_map) {
-		case 0:
+		case LED_NO_LED:
 			led_mask = 0;
 			break;
-		case 1:
+		case LED_1:
 			led_mask = UART_OUTP_LED1;
 			break;
-		case 2:
+		case LED_1_2:
 			led_mask = UART_OUTP_LED1 | UART_OUTP_LED2;
 			break;
-		case 4:
+		case LED_3:
 			led_mask = UART_OUTP_LED3;
 			break;
-		case 5:
+		case LED_2_3:
 			led_mask = UART_OUTP_LED2 | UART_OUTP_LED3;
 			break;
-		case 6:
+		case LED_1_2_3:
 			led_mask = UART_OUTP_LED1 | UART_OUTP_LED2 | UART_OUTP_LED3;
 			break;
 		default:
@@ -223,8 +438,8 @@ void setLed(uint32_t led_map) {
 			break;
 	}
 
-	uart->output_port_reset = led_mask;
-	uart->output_port_set = (~led_mask) & UART_OUTP_LED_MASK;
+	uart1_config->output_port_reset = led_mask;
+	uart1_config->output_port_set = (~led_mask) & UART_OUTP_LED_MASK;
 }
 
 // $12AA
@@ -247,6 +462,11 @@ uint32_t uartInputIsDebug(void) {
 	}
 
 	return 0;
+}
+
+// $1340
+uint32_t uartInputGetDial(void) {
+	return (uart1_config->input_port >> 2) & 0x7;
 }
 
 // $1804

@@ -218,6 +218,7 @@
 #define		CMD_ATP_POS			12
 #define		CMD_ATP_GPR			13
 #define		CMD_ATP_RES			14
+#define		CMD_APIS_BASE			100
 #define		CMD_APIS_RSRE			100
 #define		CMD_APIS_RSPA			101
 #define		CMD_APIS_RSDN			102
@@ -246,17 +247,29 @@
 #define		BUFFER_ATP_DATA		4
 #define		BUFFER_FULL		5
 
-// ATP status
-#define		ATP_STATUS_IDLE		1
-#define		ATP_STATUS_IMAGING	2
-#define		ATP_STATUS_BOOTING	3
-#define		ATP_STATUS_BOOT_FAILED	4
-#define		ATP_STATUS_SIG_TEST	15
+// ATP modes
+#define		ATP_MODE_IDLE		1
+#define		ATP_MODE_IMAGING	2
+#define		ATP_MODE_BOOTING	3
+#define		ATP_MODE_BOOT_FAILED	4
+#define		ATP_MODE_SIG_TEST	15
+
+// LED on/off
+#define		LED_NO_LED		0
+#define		LED_1			1
+#define		LED_1_2			2
+#define		LED_3			4
+#define		LED_2_3			5
+#define		LED_1_2_3		6
+
 
 // version string
 #define		AGFA_VERSION		"2.2"
 
-#define		SERIAL_BUFFER_SIZE		0x40
+#define		SERIAL_BUFFER_SIZE	0x40
+
+#define		COMMAND_COUNT_APIS	5
+#define		COMMAND_COUNT_ATP	15
 
 
 #pragma pack(1)
