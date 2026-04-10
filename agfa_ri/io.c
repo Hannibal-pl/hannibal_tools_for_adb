@@ -4,16 +4,23 @@
 #include "io.h"
 
 // forward declarations
+void atpNormalParser(void);
+void atpSigTestParser(void);
 void poolUarts(void);
 uint32_t waitForRSSH(void);
 void executeAtpLAndS(void);
 void apisWriteCommand(char *command);
+void startBoot(void);
+void initUarts(void);
 void illegalMsg(void);
 uint32_t getTwoByteInt(uint8_t *data);
 void setLed(uint32_t led_map);
 uint32_t uartInputIsDebug(void);
 uint32_t uartInputGetDial(void);
 void sysMain(void);
+void initAti(void);
+uint32_t testAndCleanSigTestOrder(void);
+void orderSigTest(void);
 void clearSerialBuffer(SERIAL_BUFFER *buf);
 uint32_t getFullBuffer(PARSER_HELPER *helper);
 void uartPuts(UART_TRANSFER *uart, char *string);
@@ -35,12 +42,24 @@ void asm_memcpy(uint8_t *dest, uint8_t *src, uint32_t len);
 PARSER_HELPER parser_helper;
 // $1500E ATP status flags
 uint32_t atp_mode;
+// $15012 APIS polarity
+uint32_t is_neg;
 // $15016 command APIS/ATP code
 uint32_t command_code;
 // $1501A optional APIS command param
 uint32_t command_param;
+// #1501E APIS baud rate set on other side of communication
+// POSSIBLE BUG
+// outer side baud rate is set but local uarts was no touched
+uint32_t apis_baud_rate;
 // $15022 ???
 uint32_t led_3_toggle;
+// $15026 we are in sig test
+uint32_t in_sig_test;
+// $1502A don't reset APIS in sig test
+uint32_t sig_test_no_apis_reset;
+// $1502E ATP !END command executed
+uint32_t is_end;
 // $15032 buffer for error string
 char error_buffer[64];
 // $150F2 buffer for !L&S ATP command
@@ -69,14 +88,12 @@ char version_string_buffer[80];
 uint32_t atp_data_length;
 // $153EA initial serial transmission timeout count
 uint32_t initial_timeout_count;
-// $153EE in sig test (singaling test ?)
-uint32_t is_sig_test;
-#warning variable meaning not fully understood 'is_sig_test'
-// $153F2 in sig test ordered
-uint32_t is_sig_test_ordered;
-#warning variable meaing not fully understood 'is_sig_test_ordered'
+// $153EE sig test was ordered (singaling test ?)
+uint32_t order_sig_test;
+// $153F2 sig test already ordered
+uint32_t was_sig_test;
 
-// $171Ac
+// $171AC
 char *atp_commands[COMMAND_COUNT_ATP] = { "!STA", "!L&S", "!BEG", "!END", "!PWR", "_GST", "_CMD", "_INF", "_SET", "_GET", "_MOD", "_NEG", "_POS", "_GPR", "_RES"};
 // $17242
 char *apis_commands[COMMAND_COUNT_APIS] = { "RE", "PA", "DN", "MG", "SH" };
@@ -111,7 +128,32 @@ void asm_entryPoint(void) {
 
 // $042C
 void cmdATI() {
-#warning TODO
+	initUarts();
+	initAti();
+	startBoot();
+
+	// enter sig test mode when reset button is held at (re)booting
+	orderSigTest();
+	if (testAndCleanSigTestOrder()) {
+		in_sig_test = 1;
+		apis_baud_rate = 1200;
+		is_neg = 0;
+		atp_mode = ATP_MODE_SIG_TEST;
+	} else {
+		in_sig_test = 0;
+	}
+
+	setLed(LED_2_3);
+
+	// main loop
+	while(1) {
+		poolUarts();
+		if (in_sig_test == 0) {
+			atpNormalParser();
+		} else if (in_sig_test == 1) {
+			atpSigTestParser();
+		}
+	}
 }
 
 // $04B4
@@ -150,6 +192,16 @@ uint32_t doApisReset(void) {
 
 	atp_mode = ATP_MODE_IDLE;
 	return 1;
+}
+
+// #055A
+void atpNormalParser(void) {
+#warning TODO
+}
+
+// $0A4A
+void atpSigTestParser(void) {
+#warning TODO
 }
 
 // $0B4E
@@ -260,6 +312,16 @@ void apisWriteCommand(char *command) {
 	uartPuts(UART_APIS, buf);
 }
 
+// $0E7E
+void atpWriteMinus(void) {
+	uartPuts(UART_ATP, "0001-");
+}
+
+// $0E94
+void atpWritePlus(void) {
+	uartPuts(UART_ATP, "0001+");
+}
+
 // $0EAA
 void illegalMsg(void) {
 	command_code = -1;
@@ -271,6 +333,18 @@ void illegalMsg(void) {
 // $0F84
 uint32_t getTwoByteInt(uint8_t *data) {
 	return (data[0] - '0') * 10 + (data[1] = '0');
+}
+
+// $0FB0
+void startBoot(void) {
+	atp_mode = ATP_MODE_BOOTING;
+	command_code = -1;
+	is_neg = 0;
+	is_end = 0;
+	led_3_toggle = 0;
+	sig_test_no_apis_reset = 0;
+	command_param = 2; // why 2 ???
+	setLed(LED_NO_LED);
 }
 
 // $1014
@@ -309,7 +383,20 @@ void executeAtpLAndS(void) {
 
 	setLed(led);
 	strcpy(las_buffer, "0004+");
-#warning TODO
+
+	orderSigTest();
+	if (testAndCleanSigTestOrder()) {
+		if (!sig_test_no_apis_reset) {
+			doApisReset();
+			sig_test_no_apis_reset = 1;
+		} else {
+			sig_test_no_apis_reset = 0;
+		}
+
+		las_buffer[5] = 'H';
+	} else {
+		las_buffer[5] = 'N';
+	}
 
 	ch = uartInputGetDial() + '0';
 	if (ch == '0') {
@@ -464,6 +551,34 @@ uint32_t uartInputIsDebug(void) {
 	return 0;
 }
 
+// $12D6
+void apisSetVideoOn(void) {
+	uart1_config->output_port_reset = UART_OUTP_APIS_VIDEO;
+}
+
+// $12E4
+void apisSetVideoOff(void) {
+	uart1_config->output_port_set = UART_OUTP_APIS_VIDEO;
+}
+
+// $12F2
+void apisSetBaudRate(uint32_t baud_rate) {
+	if (baud_rate == 2400) {
+		uart1_config->output_port_set = UART_OUTP_APIS_BAUD_RATE;
+	} else {
+		uart1_config->output_port_reset = UART_OUTP_APIS_BAUD_RATE;
+	}
+}
+
+// $131A
+void apisSetPolarity(uint32_t is_neg) {
+	if (is_neg == 1) {
+		uart1_config->output_port_reset = UART_OUTP_APIS_POLARITY;
+	} else {
+		uart1_config->output_port_set = UART_OUTP_APIS_POLARITY;
+	}
+}
+
 // $1340
 uint32_t uartInputGetDial(void) {
 	return (uart1_config->input_port >> 2) & 0x7;
@@ -476,7 +591,7 @@ void sysMain(void) {
 }
 
 // $181A
-void initATI(void) {
+void initAti(void) {
 	initial_timeout_count = 100000;
 
 	// clear all serial buffers
@@ -500,8 +615,8 @@ void initATI(void) {
 	uart_debug = UART_DEBUG;
 
 	// reset sig test variables
-	is_sig_test = 0;
-	is_sig_test_ordered = 0;
+	order_sig_test = 0;
+	was_sig_test = 0;
 
 	//check whether debug line in enabled
 	if (uartInputIsDebug()) {
@@ -598,9 +713,26 @@ void setInitialTimeoutCount(uint32_t timeout) {
 	initial_timeout_count = timeout;
 }
 
+uint32_t testAndCleanSigTestOrder(void) {
+	if (order_sig_test) {
+		order_sig_test = 0;
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 // $1B4E
-void doSigTest(void) {
-#warning TODO
+void orderSigTest(void) {
+	if (uartInputIsReset) {
+		// if we are in reset state and it is not do yet, order it
+		if (!was_sig_test) {
+			order_sig_test = 1;
+			was_sig_test = 1;
+		}
+	} else {
+		// if we are not in reset state, clear flag that we done it
+	}
 }
 
 // $1B76
@@ -643,7 +775,7 @@ void readByteApis(void) {
 	uint32_t write_index;
 	uint8_t buf;
 
-	doSigTest();
+	orderSigTest();
 
 	write_index = apis_buffer_index.write_index;
 	// try read byte form hardware ...
@@ -689,7 +821,7 @@ void readByteAtp(void) {
 	uint32_t write_index;
 	uint8_t buf;
 
-	doSigTest();
+	orderSigTest();
 
 	write_index = atp_buffer_index.write_index;
 	// try read byte form hardware ...

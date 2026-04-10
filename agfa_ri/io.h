@@ -178,9 +178,9 @@
 // Port meaning is specific to this code
 
 // UART 1 output port bits
-#define		UART_OUTP_0			0x01
-#define		UART_OUTP_1			0x02
-#define		UART_OUTP_2			0x04
+#define		UART_OUTP_APIS_BAUD_RATE	0x01	// on - 2400, off - 1200
+#define		UART_OUTP_APIS_POLARITY		0x02	// on - positive, off - negative
+#define		UART_OUTP_APIS_VIDEO		0x04	// on - disabled, off - enabled
 #define		UART_OUTP_CT_OUTPUT		0x08
 #define		UART_OUTP_RXRDY			0x10
 #define		UART_OUTP_LED1			0x20
