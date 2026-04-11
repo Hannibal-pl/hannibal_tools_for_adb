@@ -1,22 +1,43 @@
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 
 #include "io.h"
 
 // forward declarations
+void cmdATI(void);
 void atpNormalParser(void);
 void atpSigTestParser(void);
 void poolUarts(void);
 uint32_t waitForRSSH(void);
+uint32_t waitForRSDN(void);
 void executeAtpLAndS(void);
+void atpWriteMinus(void);
+void atpWritePlus(void);
 void apisWriteCommand(char *command);
+void hexToDec(char *hex_string, char *dec_string);
 void startBoot(void);
+uint32_t stringToInt(char * string);
 void initUarts(void);
 void illegalMsg(void);
 uint32_t getTwoByteInt(uint8_t *data);
 void setLed(uint32_t led_map);
 uint32_t uartInputIsDebug(void);
+void apisSetVideoOn(void);
+void apisSetVideoOff(void);
+void apisSetBaudRate(uint32_t baud_rate);
+void apisSetPolarity(uint32_t is_neg);
 uint32_t uartInputGetDial(void);
+void cmdLED(void);
+void cmdVIDEO(void);
+void cmdRESOL(void);
+void cmdINVERSE(void);
+void cmdMODE(void);
+void cmdRESET(void);
+void cmdDEBUG(void);
+void cmdTM(void);
+void cmdTM1(void);
+void cmdTM2(void);
 void sysMain(void);
 void initAti(void);
 uint32_t testAndCleanSigTestOrder(void);
@@ -32,6 +53,12 @@ void readByteAtp(void);
 void nextBufferReadIndex(SERIAL_BUFFER *buf, SERIAL_BUFFER_INDEX *buffer_index);
 void nextBufferWriteIndex(SERIAL_BUFFER_INDEX *buffer_index);
 void getAtpDataLength(uint32_t write_index);
+void cmdGO(void);
+void cmdMD(void);
+void cmdMM(void);
+void cmdLO(void);
+void cmd_(void);
+void debugLoop(void);
 void asm_copyROMtoRAM(void);
 void asm_memcpy(uint8_t *dest, uint8_t *src, uint32_t len);
 
@@ -62,6 +89,10 @@ uint32_t sig_test_no_apis_reset;
 uint32_t is_end;
 // $15032 buffer for error string
 char error_buffer[64];
+// $15072 output buffer for APIS command
+char apis_out_buffer[64];
+// $150B2 output buffer for ATP commands
+char atp_out_buffer[64];
 // $150F2 buffer for !L&S ATP command
 char las_buffer[32];
 // $15112 0 if data segment is initialized ???
@@ -92,6 +123,10 @@ uint32_t initial_timeout_count;
 uint32_t order_sig_test;
 // $153F2 sig test already ordered
 uint32_t was_sig_test;
+// $153F6 debug command to execute
+char command_buffer[80];
+// $1544A debug commandline buffers
+char cmdline_buffers[CMDLINE_BUFFER_COUNT][CMDLINE_BUFFER_SIZE];
 
 // $171AC
 char *atp_commands[COMMAND_COUNT_ATP] = { "!STA", "!L&S", "!BEG", "!END", "!PWR", "_GST", "_CMD", "_INF", "_SET", "_GET", "_MOD", "_NEG", "_POS", "_GPR", "_RES"};
@@ -99,6 +134,23 @@ char *atp_commands[COMMAND_COUNT_ATP] = { "!STA", "!L&S", "!BEG", "!END", "!PWR"
 char *apis_commands[COMMAND_COUNT_APIS] = { "RE", "PA", "DN", "MG", "SH" };
 // 172E0
 UART_CONFIG *uart1_config = UART1_CFG;
+// $17534
+DEBUG_COMMAND debug_commands[] = {	{ DEBUG_COMMAND_MAGIC, cmdLED,		"LED" },
+					{ DEBUG_COMMAND_MAGIC, cmdVIDEO,	"VIDEO" },
+					{ DEBUG_COMMAND_MAGIC, cmdRESOL,	"RESOL" },
+					{ DEBUG_COMMAND_MAGIC, cmdINVERSE,	"INVERSE" },
+					{ DEBUG_COMMAND_MAGIC, cmdMODE,		"MODE" },
+					{ DEBUG_COMMAND_MAGIC, cmdRESET,	"RESET" },
+					{ DEBUG_COMMAND_MAGIC, cmdDEBUG,	"DEBUG" },
+					{ DEBUG_COMMAND_MAGIC, cmdTM,		"TM" },
+					{ DEBUG_COMMAND_MAGIC, cmdTM1,		"TM1" },
+					{ DEBUG_COMMAND_MAGIC, cmdTM2,		"TM2" },
+					{ DEBUG_COMMAND_MAGIC, cmdATI,		"ATI" },
+					{ DEBUG_COMMAND_MAGIC, cmdGO,		"GO" },
+					{ DEBUG_COMMAND_MAGIC, cmdMD,		"MD" },
+					{ DEBUG_COMMAND_MAGIC, cmdMM,		"MM" },
+					{ DEBUG_COMMAND_MAGIC, cmdLO,		"LO" },
+					{ DEBUG_COMMAND_MAGIC, cmd_,		"" } };
 
 
 // $0400
@@ -127,7 +179,7 @@ void asm_entryPoint(void) {
 }
 
 // $042C
-void cmdATI() {
+void cmdATI(void) {
 	initUarts();
 	initAti();
 	startBoot();
@@ -196,12 +248,270 @@ uint32_t doApisReset(void) {
 
 // #055A
 void atpNormalParser(void) {
-#warning TODO
+	switch (command_code) {
+		case CMD_ATP_STA:
+			apisWriteCommand("SS");
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			if (command_param == 4) {
+				for (uint32_t i = 0; i < 1000000; i++);
+			}
+
+			if (atp_mode == ATP_MODE_IMAGING) {
+				apisWriteCommand("SS");
+				if (waitForRSSH()) {
+					if ((command_param == 3) || (command_param == 11)) {
+						atpWritePlus();
+						break;
+					}
+				}
+			}
+
+			atpWriteMinus();
+			break;
+		case CMD_ATP_LaS:
+		case CMD_ATP_MOD:
+			break;
+		case CMD_ATP_BEG:
+			char dec_value[8];
+			is_end = 0;
+			hexToDec(&parser_helper.data[4], dec_value);
+
+			apisWriteCommand("SS");
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			if (command_param == 4) {
+				for (uint32_t i = 0; i < 1000000; i++);
+			}
+
+			if ((command_param == 2) || (command_param == 11)) {
+				atp_mode = ATP_MODE_IDLE;
+			}
+			if (atp_mode == ATP_MODE_IDLE) {
+				atpWriteMinus();
+				break;
+			}
+
+			apisWriteCommand("BT");
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			sprintf(apis_out_buffer, "{SRET%s}", dec_value);
+			uartPuts(UART_APIS, apis_out_buffer);
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			apisSetBaudRate(apis_baud_rate);
+			apisSetPolarity(is_neg);
+			apisSetVideoOn();
+			atpWritePlus();
+			atp_mode = ATP_MODE_IMAGING;
+			break;
+		case CMD_ATP_END:
+			apisSetVideoOff();
+			is_end++;
+
+			do {
+				apisWriteCommand("SS");
+				poolUarts();
+				if (command_param == 9) {
+					poolUarts();
+				}
+			} while (command_param == 3);
+
+			if ((command_param != 2) && (command_param != 11) && (command_param != 4)) {
+				if (is_end >= 1) {
+					atpWriteMinus();
+					break;
+				}
+			}
+
+			atpWritePlus();
+			atp_mode = ATP_MODE_IDLE;
+			break;
+		case CMD_ATP_PWR:
+		case CMD_ATP_RES:
+			if (!doApisReset()) {
+				atp_mode = ATP_MODE_BOOT_FAILED;
+			} else {
+				atpWritePlus();
+				atp_mode = ATP_MODE_IDLE;
+			}
+			break;
+		case CMD_ATP_GST:
+			apisWriteCommand("SS");
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			if (command_param == 4) {
+				for (uint32_t i = 0; i < 1000000; i++);
+			}
+
+			sprintf(atp_out_buffer, "0003+%02d", command_param);
+			uartPuts(UART_ATP, atp_out_buffer);
+			break;
+		case CMD_ATP_CMD:
+			sprintf(apis_out_buffer, "{SRCD%s}", &parser_helper.data[4]);
+
+			apisWriteCommand("SS");
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			if (command_param == 4) {
+				for (uint32_t i = 0; i < 1000000; i++);
+			}
+
+			uartPuts(UART_APIS, apis_out_buffer);
+
+			if (!waitForRSDN()) {
+				atpWriteMinus();
+			} else {
+				atpWritePlus();
+			}
+			break;
+		case CMD_ATP_INF:
+			sprintf(atp_out_buffer, "000%d+%s", strlen(AGFA_VERSION) + 1, AGFA_VERSION);
+			uartPuts(UART_ATP, atp_out_buffer);
+			break;
+		case CMD_ATP_SET:
+			uint32_t new_baud_rate = 0;
+			if ((parser_helper.data[4] == '0') && (parser_helper.data[5] == '2')) {
+				new_baud_rate = stringToInt(&parser_helper.data[6]);
+			}
+
+			sprintf(apis_out_buffer, "{SRSP%s}", &parser_helper.data[4]);
+
+			apisWriteCommand("SS");
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			if (command_param == 4) {
+				for (uint32_t i = 0; i < 1000000; i++);
+			}
+
+			uartPuts(UART_APIS, apis_out_buffer);
+
+			if (!waitForRSDN()) {
+				atpWriteMinus();
+			} else {
+				if (new_baud_rate) {
+					apis_baud_rate = new_baud_rate;
+				}
+				atpWritePlus();
+			}
+			break;
+		case CMD_ATP_GET:
+			uint32_t i;
+			sprintf(apis_out_buffer, "{SRGP%s}", &parser_helper.data[4]);
+
+			apisWriteCommand("SS");
+			if (!waitForRSSH()) {
+				atpWriteMinus();
+				break;
+			}
+
+			if (command_param == 4) {
+				for (uint32_t i = 0; i < 1000000; i++);
+			}
+
+			uartPuts(UART_APIS, apis_out_buffer);
+
+			if (!waitForRSDN()) {
+				atpWriteMinus();
+				break;
+			}
+
+			sprintf(atp_out_buffer, "%04d+", strlen(parser_helper.data) - 6);
+			for (i = 6; parser_helper.data[i] != '{'; i++) {
+				atp_out_buffer[i - 1] = parser_helper.data[i];
+			}
+			atp_out_buffer[i - 1] = 0;
+
+			uartPuts(UART_ATP, atp_out_buffer);
+			break;
+		case CMD_ATP_NEG:
+			is_neg = 1;
+			atpWritePlus();
+			break;
+		case CMD_ATP_POS:
+			is_neg = 0;
+			atpWritePlus();
+			break;
+		case CMD_ATP_GPR:
+			if (!is_neg) {
+				uartPuts(UART_ATP, "0007+normal");
+			} else {
+				uartPuts(UART_ATP, "0008+inverse");
+			}
+			break;
+	}
 }
 
 // $0A4A
 void atpSigTestParser(void) {
-#warning TODO
+	switch (command_code) {
+		case CMD_ATP_STA:
+		case CMD_ATP_PWR:
+		case CMD_ATP_CMD:
+		case CMD_ATP_SET:
+		case CMD_ATP_GET:
+		case CMD_ATP_RES:
+			atpWritePlus();
+			break;
+		case CMD_ATP_LaS:
+		case CMD_ATP_MOD:
+			break;
+		case CMD_ATP_BEG:
+			apisSetBaudRate(apis_baud_rate);
+			apisSetPolarity(is_neg);
+			apisSetVideoOn();
+			atpWritePlus();
+			atp_mode = ATP_MODE_IMAGING;
+			break;
+		case CMD_ATP_END:
+			apisSetVideoOff();
+			atp_mode = ATP_MODE_SIG_TEST;
+			atpWritePlus();
+			break;
+		case CMD_ATP_GST:
+			uartPuts(UART_ATP, "0003+02");
+			break;
+		case CMD_ATP_INF:
+			sprintf(atp_out_buffer, "000%d+%s", strlen(AGFA_VERSION) + 1, AGFA_VERSION);
+			uartPuts(UART_ATP, atp_out_buffer);
+			break;
+		case CMD_ATP_NEG:
+			is_neg = 1;
+			atpWritePlus();
+			break;
+		case CMD_ATP_POS:
+			is_neg = 0;
+			atpWritePlus();
+			break;
+		case CMD_ATP_GPR:
+			if (!is_neg) {
+				uartPuts(UART_ATP, "0007+normal");
+			} else {
+				uartPuts(UART_ATP, "0008+inverse");
+			}
+			break;
+	}
 }
 
 // $0B4E
@@ -283,6 +593,28 @@ start:	while(!getFullBuffer(&parser_helper));
 	}
 }
 
+// $0D06
+// POSSIBLE BUG
+// This function is called by atpNormalParser() and can also call atpNormalParser() witch can cause
+// probably undesirable recurrency causing stack overflow
+uint32_t waitForRSDN(void) {
+	do {
+		poolUarts();
+	} while (command_code == CMD_APIS_RSMG);
+
+	if (command_code == CMD_APIS_RSDN) {
+		atpNormalParser();
+		return 0;
+	} else {
+		if (parser_helper.data[5] != '0') {
+			sprintf(error_buffer, "ERROR DN compl. code = %c", parser_helper.data[5]);
+			debugPuts(error_buffer);
+			return 0;
+		}
+		return 1;
+	}
+}
+
 // $0D6C
 uint32_t waitForRSSH(void) {
 	uint32_t i;
@@ -330,6 +662,27 @@ void illegalMsg(void) {
 	debugPuts(error_buffer);
 }
 
+// $0EE2
+void hexToDec(char *hex_string, char *dec_string) {
+	uint32_t value = 0;
+
+	for (uint32_t i = 0; i < 8; i++) {
+		value *= 16;
+		if (hex_string[i] > '9') {
+			value += hex_string[i] - 0x37;
+		} else {
+			value += hex_string[i] - 0x30;
+		}
+	}
+
+	for (uint32_t i = 100000; i != 1; i /= 10) {
+		uint32_t digit = (value / i);
+		value -= digit * i;
+		*(dec_string++) = digit + '0';
+		*dec_string = 0;
+	}
+}
+
 // $0F84
 uint32_t getTwoByteInt(uint8_t *data) {
 	return (data[0] - '0') * 10 + (data[1] = '0');
@@ -345,6 +698,17 @@ void startBoot(void) {
 	sig_test_no_apis_reset = 0;
 	command_param = 2; // why 2 ???
 	setLed(LED_NO_LED);
+}
+
+// $0FEC
+uint32_t stringToInt(char * string) {
+	uint32_t result = 0;
+	while (*string) {
+		result *= 10;
+		result += *(string++) - '0';
+	}
+
+	return result;
 }
 
 // $1014
@@ -582,6 +946,110 @@ void apisSetPolarity(uint32_t is_neg) {
 // $1340
 uint32_t uartInputGetDial(void) {
 	return (uart1_config->input_port >> 2) & 0x7;
+}
+
+// $1360
+void uartWriteString(UART_TRANSFER *uart, char *string) {
+	do {
+		uartWriteByte(uart, *(string++));
+	} while(*string);
+}
+
+// $138C
+uint8_t uartDebugGetc(void) {
+	uint8_t ch;
+	while (!uartReadByte(UART_DEBUG, &ch));
+	return ch;
+}
+
+// $13B2
+void uartDebugPutc(uint8_t ch) {
+	while (!uartWriteByte(UART_DEBUG, ch));
+}
+
+// $13D4 unreachable
+uint8_t uartApisGetc(void) {
+	uint8_t ch;
+	while (!uartReadByte(UART_APIS, &ch));
+	return ch;
+}
+
+// $13FA unreachable
+void uartApisPutc(uint8_t ch) {
+	while (!uartWriteByte(UART_APIS, ch));
+}
+
+// $141C
+void cmdLED(void) {
+#warning TODO
+}
+
+// $1448
+void cmdVIDEO(void) {
+#warning TODO
+}
+
+// $147A
+void cmdRESOL(void) {
+#warning TODO
+}
+
+// $14BC
+void cmdINVERSE(void) {
+#warning TODO
+}
+
+// $14E8
+void cmdMODE(void) {
+#warning TODO
+}
+
+// $1500
+void cmdRESET(void) {
+#warning TODO
+}
+
+// $1518
+void cmdDEBUG(void) {
+#warning TODO
+}
+
+// $1530
+void cmdTM(void) {
+#warning TODO
+}
+
+// $15B8
+void cmdTM1(void) {
+#warning TODO
+}
+
+// $1626
+void cmdTM2(void) {
+#warning TODO
+}
+
+// $1694 unreachable
+void startDebug(void) {
+	initUarts();
+	if (uartInputIsDebug()) {
+		uartWriteString(UART_DEBUG, "\r\nHello, this is the debug port \r\n");
+		uartWriteString(UART_DEBUG, "type  ATI  for normal operation \r\n");
+		debugLoop();
+	} else {
+		cmdATI();
+	}
+}
+
+// $17BE this was probably in standard library in original but is not in current C
+void strtoupper(char *string) {
+	uint8_t ch;
+	while(*string) {
+		ch = *(string++);
+		if ((ch >= 'a') && (ch <= 'z')) {
+			*(string - 1) = ch - 0x20;
+		}
+	}
 }
 
 // $1804
@@ -919,7 +1387,121 @@ void getAtpDataLength(uint32_t write_index) {
 			clearSerialBuffer(&atp_buffers[write_index]);
 		}
 	}
+}
 
+// $2206
+void debugPrintf(char *format, ...) {
+	va_list ap;
+	char buf[128];
+	char *charptr = buf;
+
+	va_start(ap, format);
+	vsprintf(buf, format, ap);
+	va_end(ap);
+
+	do {
+		uartDebugPutc(*(charptr++));
+	} while (*charptr);
+}
+
+// 2432
+uint32_t charToVal(uint8_t ch) {
+	if ((ch >= '0') && (ch <= '9')) {
+		return ch - 0x30;
+	} else if ((ch >= 'A') && (ch <= 'F')) {
+		return ch - 0x37;
+	} else if ((ch >= 'G') && (ch <= 'Z')) {
+		return -2;
+	}
+	return -1;
+}
+
+// $25A6
+char* cmdlineEditor(char *prompt, char *command, uint32_t size) {
+	uint8_t ch;
+	uint32_t ch_type;
+
+	*command = 0;
+	debugPrintf("%s", prompt);
+#warning TODO
+	{
+
+		ch_type = CHAR_NONE;
+		ch = uartDebugGetc();
+		if ((ch == 0x08) || (ch == 0x7F)) {
+			ch_type = CHAR_DEL;
+		} else if (ch == 0x0D) {
+			ch_type = CHAR_CR;
+		} else if (ch == 0x18) {
+			ch_type = CHAR_DEL_LINE;
+		} else if (ch == 0x1B) {
+			ch = uartDebugGetc();
+			if ((ch == '[') || (ch ='O')) {
+				switch (uartDebugGetc()) {
+					case 'A':
+						ch_type = CHAR_UP;
+						break;
+					case 'B':
+						ch_type = CHAR_DOWN;
+						break;
+					case 'C':
+						ch_type = CHAR_FORWARD;
+						break;
+					case 'D':
+						ch_type = CHAR_BACKWARD;
+						break;
+				}
+			}
+		} else if ((ch >= 0x20) && (ch < 0x7F)) {
+			ch_type = CHAR_NORMAL;
+		}
+
+	}
+
+#warning TODO
+}
+
+// $28C0
+void cmdGO(void) {
+#warning TODO
+}
+
+// $28F6
+void cmdMD(void) {
+#warning TODO
+}
+
+// $2AA8
+void cmdMM(void) {
+#warning TODO
+}
+
+// $2C6C
+void cmdLO(void) {
+#warning TODO
+}
+
+// $2E86
+void cmd_(void) {
+#warning TODO
+}
+
+// $2E98
+void runCommand(char *command) {
+#warning TODO
+}
+
+// $2F8A
+void debugLoop(void) {
+	// clean commandline buffers
+	for (uint32_t i = 0; i < CMDLINE_BUFFER_COUNT; i++) {
+		cmdline_buffers[i][0] = 0;
+	}
+
+	while(1) {
+		cmdlineEditor("ati> ", command_buffer, 75);
+		runCommand(command_buffer);
+	}
 }
 
 // $C0BC

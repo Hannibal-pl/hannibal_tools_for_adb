@@ -226,41 +226,52 @@
 #define		CMD_APIS_RSSH			104
 
 // memory mapped UARTs
-#define		UART1_CFG		((UART_CONFIG *)   (0x40000))
-#define		UART_ATP		((UART_TRANSFER *) (0x40000))
-#define		UART_APIS		((UART_TRANSFER *) (0x40010))
-#define		UART2_CFG		((UART_CONFIG *)   (0x50000))
-#define		UART_DEBUG		((UART_TRANSFER *) (0x50000))
+#define		UART1_CFG			((UART_CONFIG *)   (0x40000))
+#define		UART_ATP			((UART_TRANSFER *) (0x40000))
+#define		UART_APIS			((UART_TRANSFER *) (0x40010))
+#define		UART2_CFG			((UART_CONFIG *)   (0x50000))
+#define		UART_DEBUG			((UART_TRANSFER *) (0x50000))
 
 // number of individual setial buffers per UART
-#define		SERIAL_BUFFER_COUNT	4
+#define		SERIAL_BUFFER_COUNT		4
 
 // serial type
-#define		SERIAL_TYPE_APIS	1 // APIS - Agfa Printer Interface Specification ?
-#define		SERIAL_TYPE_ATP		2 // ATP  - Agfa Technical Protocol ?
+#define		SERIAL_TYPE_APIS		1 // APIS - Agfa Printer Interface Specification ?
+#define		SERIAL_TYPE_ATP			2 // ATP  - Agfa Technical Protocol ?
 
 // serial buffer flags
-#define		BUFFER_EMPTY		0
-#define		BUFFER_IN_PROCES	1
-#define		BUFFER_APIS_DATA	2
-#define		BUFFER_ATP_LENGTH	3
-#define		BUFFER_ATP_DATA		4
-#define		BUFFER_FULL		5
+#define		BUFFER_EMPTY			0
+#define		BUFFER_IN_PROCES		1
+#define		BUFFER_APIS_DATA		2
+#define		BUFFER_ATP_LENGTH		3
+#define		BUFFER_ATP_DATA			4
+#define		BUFFER_FULL			5
 
 // ATP modes
-#define		ATP_MODE_IDLE		1
-#define		ATP_MODE_IMAGING	2
-#define		ATP_MODE_BOOTING	3
-#define		ATP_MODE_BOOT_FAILED	4
-#define		ATP_MODE_SIG_TEST	15
+#define		ATP_MODE_IDLE			1
+#define		ATP_MODE_IMAGING		2
+#define		ATP_MODE_BOOTING		3
+#define		ATP_MODE_BOOT_FAILED		4
+#define		ATP_MODE_SIG_TEST		15
 
 // LED on/off
-#define		LED_NO_LED		0
-#define		LED_1			1
-#define		LED_1_2			2
-#define		LED_3			4
-#define		LED_2_3			5
-#define		LED_1_2_3		6
+#define		LED_NO_LED			0
+#define		LED_1				1
+#define		LED_1_2				2
+#define		LED_3				4
+#define		LED_2_3				5
+#define		LED_1_2_3			6
+
+// commandline char types
+#define		CHAR_NONE			0
+#define		CHAR_CR				1
+#define		CHAR_DEL			2
+#define		CHAR_UP				3
+#define		CHAR_DOWN			4
+#define		CHAR_BACKWARD			5
+#define		CHAR_FORWARD			6
+#define		CHAR_NORMAL			7
+#define		CHAR_DEL_LINE			8
 
 
 // version string
@@ -268,8 +279,13 @@
 
 #define		SERIAL_BUFFER_SIZE	0x40
 
+#define		CMDLINE_BUFFER_SIZE	0x50
+#define		CMDLINE_BUFFER_COUNT	10
+
 #define		COMMAND_COUNT_APIS	5
 #define		COMMAND_COUNT_ATP	15
+
+#define		DEBUG_COMMAND_MAGIC	0xBAFBAF11
 
 
 #pragma pack(1)
@@ -341,5 +357,11 @@ typedef struct {
 	uint8_t*		data;
 	uint32_t		length;
 } PARSER_HELPER;
+
+typedef struct {
+	uint32_t		magic;
+	void			(*func)();
+	char			name[8];
+} DEBUG_COMMAND;
 
 #endif
