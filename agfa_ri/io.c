@@ -5,7 +5,7 @@
 #include "io.h"
 
 // forward declarations
-void cmdATI(void);
+int32_t cmdATI(void);
 void atpNormalParser(void);
 void atpSigTestParser(void);
 void poolUarts(void);
@@ -28,16 +28,16 @@ void apisSetVideoOff(void);
 void apisSetBaudRate(uint32_t baud_rate);
 void apisSetPolarity(uint32_t is_neg);
 uint32_t uartInputGetDial(void);
-void cmdLED(void);
-void cmdVIDEO(void);
-void cmdRESOL(void);
-void cmdINVERSE(void);
-void cmdMODE(void);
-void cmdRESET(void);
-void cmdDEBUG(void);
-void cmdTM(void);
-void cmdTM1(void);
-void cmdTM2(void);
+int32_t cmdLED(void);
+int32_t cmdVIDEO(void);
+int32_t cmdRESOL(void);
+int32_t cmdINVERSE(void);
+int32_t cmdMODE(void);
+int32_t cmdRESET(void);
+int32_t cmdDEBUG(void);
+int32_t cmdTM(void);
+int32_t cmdTM1(void);
+int32_t cmdTM2(void);
 void sysMain(void);
 void initAti(void);
 uint32_t testAndCleanSigTestOrder(void);
@@ -53,11 +53,13 @@ void readByteAtp(void);
 void nextBufferReadIndex(SERIAL_BUFFER *buf, SERIAL_BUFFER_INDEX *buffer_index);
 void nextBufferWriteIndex(SERIAL_BUFFER_INDEX *buffer_index);
 void getAtpDataLength(uint32_t write_index);
-void cmdGO(void);
-void cmdMD(void);
-void cmdMM(void);
-void cmdLO(void);
-void cmd_(void);
+void debugPrintf(char *format, ...);
+int32_t debugStrtoul(uint32_t *value, uint32_t base);
+int32_t cmdGO(void);
+int32_t cmdMD(void);
+int32_t cmdMM(void);
+int32_t cmdLO(void);
+int32_t cmd_(void);
 void debugLoop(void);
 void asm_copyROMtoRAM(void);
 void asm_memcpy(uint8_t *dest, uint8_t *src, uint32_t len);
@@ -125,6 +127,8 @@ uint32_t order_sig_test;
 uint32_t was_sig_test;
 // $153F6 debug command to execute
 char command_buffer[80];
+// $15446 pointer command
+char *cmd_parser_ptr;
 // $1544A debug commandline buffers
 char cmdline_buffers[CMDLINE_BUFFER_COUNT][CMDLINE_BUFFER_SIZE];
 
@@ -134,6 +138,8 @@ char *atp_commands[COMMAND_COUNT_ATP] = { "!STA", "!L&S", "!BEG", "!END", "!PWR"
 char *apis_commands[COMMAND_COUNT_APIS] = { "RE", "PA", "DN", "MG", "SH" };
 // 172E0
 UART_CONFIG *uart1_config = UART1_CFG;
+// $17534 is debug command conitunued
+uint32_t is_continue;
 // $17534
 DEBUG_COMMAND debug_commands[] = {	{ DEBUG_COMMAND_MAGIC, cmdLED,		"LED" },
 					{ DEBUG_COMMAND_MAGIC, cmdVIDEO,	"VIDEO" },
@@ -151,6 +157,8 @@ DEBUG_COMMAND debug_commands[] = {	{ DEBUG_COMMAND_MAGIC, cmdLED,		"LED" },
 					{ DEBUG_COMMAND_MAGIC, cmdMM,		"MM" },
 					{ DEBUG_COMMAND_MAGIC, cmdLO,		"LO" },
 					{ DEBUG_COMMAND_MAGIC, cmd_,		"" } };
+// $17644
+DEBUG_COMMAND *debug_commands_ptr = debug_commands;
 
 
 // $0400
@@ -179,7 +187,7 @@ void asm_entryPoint(void) {
 }
 
 // $042C
-void cmdATI(void) {
+int32_t cmdATI(void) {
 	initUarts();
 	initAti();
 	startBoot();
@@ -980,53 +988,140 @@ void uartApisPutc(uint8_t ch) {
 }
 
 // $141C
-void cmdLED(void) {
-#warning TODO
+int32_t cmdLED(void) {
+	uint32_t value;
+
+	if (!debugStrtoul(&value, 10)) {
+		return -1;
+	}
+
+	setLed(value);
+
+	return 0;
 }
 
 // $1448
-void cmdVIDEO(void) {
-#warning TODO
+int32_t cmdVIDEO(void) {
+	uint32_t value;
+
+	if (!debugStrtoul(&value, 10)) {
+		return -1;
+	}
+
+	if (!value) {
+		apisSetVideoOn();
+	} else {
+		apisSetVideoOff();
+	}
+
+	return 0;
 }
 
 // $147A
-void cmdRESOL(void) {
-#warning TODO
+int32_t cmdRESOL(void) {
+	uint32_t value;
+
+	if (!debugStrtoul(&value, 10)) {
+		return -1;
+	}
+
+	if ((value == 1200) || (value == 2400)) {
+		apisSetBaudRate(value);
+	}
+
+	return 0;
 }
 
 // $14BC
-void cmdINVERSE(void) {
-#warning TODO
+int32_t cmdINVERSE(void) {
+	uint32_t value;
+
+	if (!debugStrtoul(&value, 10)) {
+		return -1;
+	}
+
+	apisSetPolarity(value);
+
+	return 0;
 }
 
 // $14E8
-void cmdMODE(void) {
-#warning TODO
+int32_t cmdMODE(void) {
+	debugPrintf("Mode = $%02x\n", uartInputGetDial());
+	return 0;
 }
 
 // $1500
-void cmdRESET(void) {
-#warning TODO
+int32_t cmdRESET(void) {
+	debugPrintf("Reset button = %d\n", uartInputIsReset());
+	return 0;
 }
 
 // $1518
-void cmdDEBUG(void) {
-#warning TODO
+int32_t cmdDEBUG(void) {
+	debugPrintf("Debug = %d\n", uartInputIsDebug());
+	return 0;
 }
 
 // $1530
-void cmdTM(void) {
-#warning TODO
+int32_t cmdTM(void) {
+	uint8_t buf;
+
+	do {
+		buf = 0;
+		if (uartReadByte(UART_ATP, &buf)) {
+			uartWriteByte(UART_APIS, buf);
+		}
+
+		buf = 0;
+		if (uartReadByte(UART_APIS, &buf)) {
+			uartWriteByte(UART_ATP, buf);
+		}
+		buf = 0;
+		if (uartReadByte(UART_DEBUG, &buf)) {
+			// Yes it looks like empty if
+		}
+	} while (buf != 3);
+
+	return 0;
 }
 
 // $15B8
-void cmdTM1(void) {
-#warning TODO
+int32_t cmdTM1(void) {
+	uint8_t buf;
+
+	do {
+		buf = 0;
+		if (uartReadByte(UART_ATP, &buf)) {
+			uartWriteByte(UART_DEBUG, buf);
+		}
+
+		buf = 0;
+		if (uartReadByte(UART_DEBUG, &buf)) {
+			uartWriteByte(UART_ATP, buf);
+		}
+	} while (buf != 3);
+
+	return 0;
 }
 
 // $1626
-void cmdTM2(void) {
-#warning TODO
+int32_t cmdTM2(void) {
+	uint8_t buf;
+
+	do {
+		buf = 0;
+		if (uartReadByte(UART_APIS, &buf)) {
+			uartWriteByte(UART_DEBUG, buf);
+		}
+
+		buf = 0;
+		if (uartReadByte(UART_DEBUG, &buf)) {
+			uartWriteByte(UART_APIS, buf);
+		}
+	} while (buf != 3);
+
+	return 0;
 }
 
 // $1694 unreachable
@@ -1405,7 +1500,7 @@ void debugPrintf(char *format, ...) {
 }
 
 // 2432
-uint32_t charToVal(uint8_t ch) {
+int32_t charToVal(uint8_t ch) {
 	if ((ch >= '0') && (ch <= '9')) {
 		return ch - 0x30;
 	} else if ((ch >= 'A') && (ch <= 'F')) {
@@ -1414,6 +1509,73 @@ uint32_t charToVal(uint8_t ch) {
 		return -2;
 	}
 	return -1;
+}
+
+// $24B0
+uint32_t removeWhitespace(void) {
+	char ch;
+	do {
+		ch = *(cmd_parser_ptr++);
+	} while ((ch == ' ') || (ch == '\t'));
+	return ch;
+}
+
+// $24D6
+void extractCommand(char *command, uint32_t len) {
+	do {
+		if (((*cmd_parser_ptr >= 'A') && (*cmd_parser_ptr <= 'Z')) || ((*cmd_parser_ptr >= '0') && (*cmd_parser_ptr <= '9'))) {
+			*(command++) = *(cmd_parser_ptr++);
+		} else {
+			break;
+		}
+	} while (--len > 0);
+}
+
+// $2520
+int32_t debugStrtoul(uint32_t *value, uint32_t base) {
+	uint32_t is_something = 0;
+	int32_t char_val;
+
+	removeWhitespace();
+
+	// force decimal
+	if (*cmd_parser_ptr == '$') {
+		cmd_parser_ptr++;
+		base = 10;
+	}
+
+	// force hexadecimal
+	if (*cmd_parser_ptr == '&') {
+		cmd_parser_ptr++;
+		base = 16;
+	}
+
+	*value = 0;
+
+	do {
+		char_val = charToVal(*(cmd_parser_ptr));
+
+		// letter or nuber greater than base
+		if ((char_val == -2) || (char_val >= base)) {
+			return -1;
+		}
+
+		if (char_val >= 0) {
+			*value = *value * base + char_val;
+		}
+
+		if (char_val >= 0) {
+			is_something = 1;
+		}
+
+	} while (char_val != -1);
+
+	if (!is_something) {
+		return -1;
+	}
+
+	cmd_parser_ptr--;
+	return 0;
 }
 
 // $25A6
@@ -1462,33 +1624,76 @@ char* cmdlineEditor(char *prompt, char *command, uint32_t size) {
 }
 
 // $28C0
-void cmdGO(void) {
+int32_t cmdGO(void) {
 #warning TODO
 }
 
 // $28F6
-void cmdMD(void) {
+int32_t cmdMD(void) {
 #warning TODO
 }
 
 // $2AA8
-void cmdMM(void) {
+int32_t cmdMM(void) {
 #warning TODO
 }
 
 // $2C6C
-void cmdLO(void) {
+int32_t cmdLO(void) {
 #warning TODO
 }
 
 // $2E86
-void cmd_(void) {
+int32_t cmd_(void) {
 #warning TODO
 }
 
 // $2E98
 void runCommand(char *command) {
-#warning TODO
+	char cmd[8];
+	uint32_t i;
+	DEBUG_COMMAND *commands;
+
+	strtoupper(cmd_parser_ptr);
+	if (!removeWhitespace()) {
+		is_continue = 0;
+	}
+
+	extractCommand(cmd, sizeof(cmd));
+	removeWhitespace();
+
+	// find and run command
+	for (commands = debug_commands_ptr; commands < debug_commands_ptr + sizeof(debug_commands); commands += sizeof(DEBUG_COMMAND)) {
+		if (commands->magic != DEBUG_COMMAND_MAGIC) {
+			continue;
+		}
+
+		if (strcmp(commands->name, cmd)) {
+			continue;
+		}
+
+		if (commands->func()) {
+			debugPrintf("Syntax error\n");
+		}
+		return;
+	}
+
+	debugPrintf("Unknown command '%s'", cmd);
+
+	// display available commands
+	for (i = 0, commands = debug_commands_ptr; commands < debug_commands_ptr + sizeof(debug_commands); commands += sizeof(DEBUG_COMMAND)) {
+		if (commands->magic != DEBUG_COMMAND_MAGIC) {
+			continue;
+		}
+
+		if ((i++) & 7) {
+			debugPrintf("\n   ");
+		}
+
+		debugPrintf("%7s ", commands->name);
+	}
+
+	debugPrintf("\n");
 }
 
 // $2F8A

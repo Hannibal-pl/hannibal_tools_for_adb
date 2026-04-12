@@ -360,7 +360,7 @@ typedef struct {
 
 typedef struct {
 	uint32_t		magic;
-	void			(*func)();
+	int32_t			(*func)();
 	char			name[8];
 } DEBUG_COMMAND;
 
