@@ -9,8 +9,9 @@ int32_t cmdATI(void);
 void atpNormalParser(void);
 void atpSigTestParser(void);
 void poolUarts(void);
-uint32_t waitForRSSH(void);
 uint32_t waitForRSDN(void);
+uint32_t waitForRSSH(void);
+uint32_t waitForRSPA(void);
 void executeAtpLAndS(void);
 void atpWriteMinus(void);
 void atpWritePlus(void);
@@ -79,7 +80,7 @@ uint32_t command_code;
 uint32_t command_param;
 // #1501E APIS baud rate set on other side of communication
 // POSSIBLE BUG
-// outer side baud rate is set but local uarts was no touched
+// outher side baud rate is set but local uarts was no touched
 uint32_t apis_baud_rate;
 // $15022 ???
 uint32_t led_3_toggle;
@@ -136,8 +137,14 @@ char cmdline_buffers[CMDLINE_BUFFER_COUNT][CMDLINE_BUFFER_SIZE];
 char *atp_commands[COMMAND_COUNT_ATP] = { "!STA", "!L&S", "!BEG", "!END", "!PWR", "_GST", "_CMD", "_INF", "_SET", "_GET", "_MOD", "_NEG", "_POS", "_GPR", "_RES"};
 // $17242
 char *apis_commands[COMMAND_COUNT_APIS] = { "RE", "PA", "DN", "MG", "SH" };
-// 172E0
+// $172E0
 UART_CONFIG *uart1_config = UART1_CFG;
+// $15528 memory dump start address
+uint32_t dump_start_addr = 0x10000;
+// $1552C memory dump length
+uint32_t dump_length = 0x1F;
+// $15530 memory modify start address
+uint32_t mod_start_addr = 0x10000;
 // $17534 is debug command conitunued
 uint32_t is_continue;
 // $17534
@@ -440,7 +447,7 @@ void atpNormalParser(void) {
 
 			uartPuts(UART_APIS, apis_out_buffer);
 
-			if (!waitForRSDN()) {
+			if (!waitForRSPA()) {
 				atpWriteMinus();
 				break;
 			}
@@ -642,6 +649,32 @@ uint32_t waitForRSSH(void) {
 	}
 
 	return 1;
+}
+
+// $0DBE
+uint32_t waitForRSPA(void) {
+	uint32_t i;
+
+	poolUarts();
+	for (i = 0; i <= 5; i++) {
+		if (command_code == CMD_APIS_RSPA) {
+			break;
+		}
+		poolUarts();
+	}
+
+	if (i > 5) {
+		sprintf(error_buffer, "PA timed out");
+		debugPuts(error_buffer);
+		return 0;
+	} else {
+		if (parser_helper.data[5] != '0') {
+			sprintf(error_buffer, "ERROR PA compl. code = %c", parser_helper.data[5]);
+			debugPuts(error_buffer);
+			return 0;
+		}
+		return 1;
+	}
 }
 
 // $0E4C
@@ -1136,6 +1169,30 @@ void startDebug(void) {
 	}
 }
 
+// $16D4
+// strlen
+
+// $16E4
+// strcpy
+
+// $16E2 unreachable
+// strcat
+
+// $1708 unreacheable
+// strncpy
+
+// $1728 unreachable
+// strcat
+
+// $1750 unreachable
+// strchr
+
+// $1768 unreachable
+// strrchr
+
+// $178C
+// strncmp
+
 // $17BE this was probably in standard library in original but is not in current C
 void strtoupper(char *string) {
 	uint8_t ch;
@@ -1146,6 +1203,9 @@ void strtoupper(char *string) {
 		}
 	}
 }
+
+// $17E8
+// strcmp
 
 // $1804
 void sysMain(void) {
@@ -1276,6 +1336,7 @@ void setInitialTimeoutCount(uint32_t timeout) {
 	initial_timeout_count = timeout;
 }
 
+// $1B36
 uint32_t testAndCleanSigTestOrder(void) {
 	if (order_sig_test) {
 		order_sig_test = 0;
@@ -1295,6 +1356,7 @@ void orderSigTest(void) {
 		}
 	} else {
 		// if we are not in reset state, clear flag that we done it
+		was_sig_test = 0;
 	}
 }
 
@@ -1484,6 +1546,15 @@ void getAtpDataLength(uint32_t write_index) {
 	}
 }
 
+// $20B4
+// vsprintf internal call
+
+// $20FC
+// vsprintf internal call
+
+// $21F2
+// sprintf
+
 // $2206
 void debugPrintf(char *format, ...) {
 	va_list ap;
@@ -1499,7 +1570,10 @@ void debugPrintf(char *format, ...) {
 	} while (*charptr);
 }
 
-// 2432
+// $224A
+// vsprintf
+
+// $2432
 int32_t charToVal(uint8_t ch) {
 	if ((ch >= '0') && (ch <= '9')) {
 		return ch - 0x30;
@@ -1509,6 +1583,15 @@ int32_t charToVal(uint8_t ch) {
 		return -2;
 	}
 	return -1;
+}
+
+// $247A
+uint8_t numberToToken(uint8_t ch) {
+	if (((ch >=0) && (ch <=9)) || ((ch >= 'A') || (ch <= 'F')) || (ch == '$') || (ch == '&')) {
+		ch = 'n';
+	}
+
+	return ch;
 }
 
 // $24B0
@@ -1598,7 +1681,6 @@ char* cmdlineEditor(char *prompt, char *command, uint32_t size) {
 	screen_last_char = 0;
 	cursor_column = 0;
 	cursor_row = -1;
-	// var4
 	command_column = command;
 	*command_column = 0;
 
@@ -1789,6 +1871,7 @@ int32_t cmdGO(void) {
 		return -1;
 	}
 
+	// WARNING %L is obsolete, current equivalent is %08X
 	debugPrintf("GO %L\n", value);
 
 	// this 32-bit pointer won't work on current 64-bit systems
@@ -1799,17 +1882,305 @@ int32_t cmdGO(void) {
 
 // $28F6
 int32_t cmdMD(void) {
-#warning TODO
+	uint32_t start_addr = dump_start_addr;
+	uint32_t end_addr;
+	uint32_t len;
+
+	// get dump start address
+	removeWhitespace();
+	if (!debugStrtoul(&start_addr, 16)) {
+		return -1;
+	}
+
+	end_addr = dump_start_addr + dump_length;
+
+	// get dump length or end address
+	removeWhitespace();
+	if (removeWhitespace()) { // yes two times in row
+		if (*cmd_parser_ptr == ':') {
+			cmd_parser_ptr++;
+			if (!debugStrtoul(&len, 16)) {
+				return -1;
+			}
+			end_addr = start_addr + len - 1;
+		} else {
+			if (!debugStrtoul(&end_addr, 16)) {
+				return -1;
+			}
+		}
+	}
+
+	// update global dump start address and length
+	dump_start_addr = end_addr + 1;
+	dump_length = end_addr - start_addr;
+	is_continue = 1;
+
+	// WARNING %L is obsolete, current equivalent is %08X
+	debugPrintf("Memory dump from %L to %L \n", start_addr, end_addr);
+
+	// empty dump
+	if (end_addr <= start_addr) {
+		return -1;
+	}
+
+	for (uint32_t addr = start_addr; addr <= end_addr; addr += 0x10) {
+		// display address
+		// WARNING %L is obsolete, current equivalent is %08X
+		debugPrintf("%L ", addr);
+		for (uint32_t i = 0; i < 0x10; i++ ) {
+			// display 16 hex values
+			if (addr + i > end_addr) {
+				debugPrintf(" --");
+			} else {
+				// WARNING %B is obsolete, current equivalent is %02X
+				debugPrintf(" %B", *(uint8_t *)(addr + i));
+			}
+		}
+
+		debugPrintf("  ");
+
+		for (uint32_t i = 0; i < 0x10; i++ ) {
+			// display 16 raw values
+			if (addr + i > end_addr) {
+				break;
+			} else {
+				uint8_t ch = (*(uint8_t *)(addr + i)) & 0x7F;
+				if ((ch < 0x20) || (ch >= 0x7F)) {
+					ch = '.';
+				}
+				uartDebugPutc(ch);
+			}
+		}
+
+		debugPrintf("\n");
+	}
 }
 
 // $2AA8
 int32_t cmdMM(void) {
-#warning TODO
+	uint32_t start_addr = mod_start_addr;
+	uint32_t is_end;
+	int32_t inc;
+	uint32_t do_inc;
+
+	// read new start address if available
+	if (*cmd_parser_ptr) {
+		if (!debugStrtoul(&start_addr, 16)) {
+			return -1;
+		}
+
+		mod_start_addr = start_addr;
+	}
+
+	// WARNING %L is obsolete, current equivalent is %08X
+	debugPrintf("Memory modify at %L\n", start_addr);
+
+	is_end = 0;
+	do {
+		// WARNING %L & %B are obsolete, current equivalent is %08X & %02X
+		debugPrintf("%L %B", start_addr, *(uint8_t *)start_addr);
+		inc = 1;
+
+		cmdlineEditor(" ? ", command_buffer, 64);
+		strtoupper(command_buffer);
+		cmd_parser_ptr = command_buffer;
+		do_inc = 1;
+
+		do {
+			int8_t ch;
+			ch = numberToToken(*cmd_parser_ptr);
+			switch (ch) {
+				case 0:
+				case ' ':
+				case ',':
+					break;
+				case '.':
+					is_end = 1;
+					break;
+				case '=':
+					inc = 0;
+					break;
+				case '^':
+					inc = -1;
+					break;
+				case 'V':
+					inc = 1;
+					break;
+				case 'n':
+					uint32_t number;
+
+					if (!debugStrtoul(&number, 16)) {
+						debugPrintf("Invalid number\n");
+						break;
+					}
+
+					*(uint8_t *)(start_addr++) = number & 0xFF;
+					do_inc = 0;
+					cmd_parser_ptr--;
+
+					break;
+				case '"':
+				case '\'':
+					cmd_parser_ptr++;
+					while ((*cmd_parser_ptr != ch) && (*cmd_parser_ptr != 0)) {
+						*(uint8_t *)(start_addr++) = *(cmd_parser_ptr++);
+					}
+					do_inc = 0;
+					break;
+				default:
+					debugPrintf("Invalid command (use '= ^ v .')\n");
+					*cmd_parser_ptr = 0;
+					break;
+			}
+
+			if (*cmd_parser_ptr) {
+				cmd_parser_ptr++;
+			}
+		} while (*cmd_parser_ptr);
+
+		// do inc/decrement
+		if (do_inc) {
+			start_addr += inc;
+		}
+
+	} while (!is_end);
+
+	return 0;
 }
 
 // $2C6C
 int32_t cmdLO(void) {
-#warning TODO
+	uint32_t base_offset = 0;
+	uint32_t low_addr = 0x7FFFFFFF;
+	uint32_t hi_addr = 0;
+	uint32_t start_addr;
+	uint32_t srecord_type = 0;
+	char *srecord;
+	uint8_t bin_buffer[256];
+	uint32_t checksum;
+	uint32_t i;
+	uint32_t even_odd;
+
+	debugPrintf("Load S-rec %s\n", cmd_parser_ptr);
+
+	do {
+		srecord_type = 0;
+
+		do {
+			uint8_t ch;
+			srecord = command_buffer;
+			// POSSIBLE BUG
+			// command_buffer is to short to support all valid S-records
+			uint32_t i = CMDLINE_BUFFER_SIZE;
+
+			// skip spaces;
+			while ((ch = uartDebugGetc()) == ' ');
+
+			// copy one S-record line to commandline buffer
+			do {
+				srecord++;
+				ch = uartDebugGetc();
+			} while ((ch != ' ') && --i);
+			srecord == 0;
+
+			srecord = command_buffer;
+		} while (*srecord == 0);
+
+		// check if input is S-record
+		if ((*srecord == 'S') && (*(srecord + 1) >= 0) && (*(srecord + 1) <= '9')) {
+			srecord_type = *(++srecord);
+			srecord++;
+
+			checksum = 0;
+			i = 0;
+
+			// convert hex to binary
+			do {
+				uint8_t ch_lo, ch_hi, ch;
+
+				ch_hi = charToVal(*(srecord++));
+				if (ch_hi < 0) {
+					break;
+				}
+
+				ch_lo = charToVal(*(srecord++));
+				if (ch_lo < 0) {
+					break;
+				}
+
+				ch = ch_hi << 4 + ch_lo;
+
+				bin_buffer[i++] = ch;
+				checksum += ch;
+			} while (*bin_buffer > i); //at first byte is record length
+
+			// check S-record correctness (length, full buffer use, checksum)
+			if ((*bin_buffer == i - 1) && (*srecord == 0) && (((checksum + 1) & 0xFF) == 0)) {
+				uint32_t srecord_addr_len = 0;
+				uint32_t srecord_len_sub = 0;
+
+				switch (srecord_type) {
+					case 1:
+						srecord_addr_len = 2;
+						srecord_len_sub = 3;
+						break;
+					case 2:
+						srecord_addr_len = 3;
+						srecord_len_sub = 4;
+						break;
+					case 3:
+						srecord_addr_len = 4;
+						srecord_len_sub = 5;
+						break;
+					case 7:
+						srecord_addr_len = 4;
+						break;
+					case 8:
+						srecord_addr_len = 3;
+						break;
+					case 9:
+						srecord_addr_len = 2;
+						break;
+					default:
+						break;
+				}
+
+				// extract start address if present
+				if (srecord_addr_len) {
+					start_addr = 0;
+					for (i = 1; i <= srecord_addr_len; i++) {
+						start_addr = (start_addr << 8) + bin_buffer[i];
+					}
+				}
+				start_addr += base_offset;
+
+				// if non zero, data is available
+				if (srecord_len_sub) {
+					// find low address ...
+					if (low_addr > start_addr) {
+						low_addr = start_addr;
+					}
+					// ... and high address
+					if (hi_addr < (*bin_buffer + start_addr)) {
+						hi_addr = *bin_buffer + start_addr;
+					}
+
+					// copy S-record data to memory
+					i = srecord_len_sub;
+					do {
+						*(uint8_t *)(start_addr + i - srecord_len_sub) = bin_buffer[i];
+					} while (*bin_buffer > i);
+				}
+
+				// POSSIBLE BUG
+				// uninitalized and nowhere used variable besides below
+				even_odd ^= 1;
+			}
+		}
+	} while (!((srecord_type >= 7) && (srecord_type <= 9)));
+
+	debugPrintf("\nStart address = %L   (low=%L high=%L)\n", start_addr, low_addr, hi_addr);
+	return 0;
 }
 
 // $2E86
@@ -1882,6 +2253,19 @@ void debugLoop(void) {
 	}
 }
 
+// $2FCE unreachable
+void exceptionHandler(void) {
+}
+
+// $2FD0
+// compiler internal long mod
+
+// $302E
+// compiler internal long div
+
+// $3090
+// compiler internal long mul
+
 // $C0BC
 // WARNING - This function was written in assebler and is presented here as C pseudocode
 void asm_copyROMtoRAM(void) {
@@ -1896,3 +2280,12 @@ void asm_memcpy(uint8_t *dest, uint8_t *src, uint32_t len) {
 		*(dest++) = *(src++);
 	}
 }
+
+// $30F2
+// vsprintf internal call
+
+// $30FA
+// vsprintf internal call
+
+// $3100
+// vsprintf internal call
