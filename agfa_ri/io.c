@@ -1580,20 +1580,37 @@ int32_t debugStrtoul(uint32_t *value, uint32_t base) {
 
 // $25A6
 char* cmdlineEditor(char *prompt, char *command, uint32_t size) {
+	// POSSIBLE BUG
+	// in code not existant fourth argument id tested
+	// most probable function of it is wheter command buffer exists
+	//
+	// it points now to the function return address witch is nonzero
+	uint32_t arg4 = 1;
+
+	char *tmp;
 	uint8_t ch;
 	uint32_t ch_type;
+	uint32_t screen_last_char;
+	uint32_t cursor_column;
+	uint32_t cursor_row;
+	char *command_column;
 
-	*command = 0;
+	screen_last_char = 0;
+	cursor_column = 0;
+	cursor_row = -1;
+	// var4
+	command_column = command;
+	*command_column = 0;
+
 	debugPrintf("%s", prompt);
-#warning TODO
-	{
 
+	do {
 		ch_type = CHAR_NONE;
 		ch = uartDebugGetc();
 		if ((ch == 0x08) || (ch == 0x7F)) {
 			ch_type = CHAR_DEL;
 		} else if (ch == 0x0D) {
-			ch_type = CHAR_CR;
+			ch_type = CHAR_NEW_LINE;
 		} else if (ch == 0x18) {
 			ch_type = CHAR_DEL_LINE;
 		} else if (ch == 0x1B) {
@@ -1618,14 +1635,166 @@ char* cmdlineEditor(char *prompt, char *command, uint32_t size) {
 			ch_type = CHAR_NORMAL;
 		}
 
+		switch (ch_type) {
+			case CHAR_NORMAL:
+				uint8_t tmp_ch;
+
+				if (screen_last_char >= size - 1) {
+					break;
+				}
+
+				screen_last_char++;
+				cursor_column++;
+				// put empty space if neeeded
+				if (cursor_column != screen_last_char) {
+					debugPrintf("\x1B[@");
+				}
+				uartDebugPutc(ch);
+
+				// insert char into command
+				tmp = command_column;
+				do {
+					tmp_ch = *tmp;
+					*(tmp++) = ch;
+					tmp_ch = ch;
+				} while (ch);
+				*tmp = 0;
+
+				break;
+			case CHAR_DEL:
+				if (cursor_column > 0) {
+					screen_last_char--;
+					cursor_column--;
+					command_column--;
+				}
+
+				// fill gap
+				for (char *tmp = command_column; *tmp; tmp++) {
+					*tmp = *(tmp + 1);
+				}
+
+				if (screen_last_char == cursor_column) {
+					debugPrintf("\b \b");
+				} else {
+					debugPrintf("\b\x1B[P");
+				}
+				break;
+			case CHAR_BACKWARD:
+				if (cursor_column > 0) {
+					cursor_column--;
+					command_column--;
+					debugPrintf("\x1B[D");
+				}
+				break;
+			case CHAR_FORWARD:
+				if (cursor_column <= screen_last_char) {
+					cursor_column++;
+					command_column++;
+					debugPrintf("\x1B[C");
+				}
+				break;
+			case CHAR_UP:
+				if (!arg4) { // see at declarations
+					break;
+				}
+
+				if (cursor_row < 9) {
+					cursor_row++;
+				}
+
+				// fill current command from commandline buffers
+				command_column = command;
+				for (char *tmp = cmdline_buffers[cursor_row]; *tmp; command_column++, tmp++) {
+					*(command_column) = *(tmp);
+				}
+				command_column--;
+
+				// count 'new' comand length
+				cursor_column = (uint32_t)(command_column - command);
+				screen_last_char = cursor_column;
+
+				// display 'new' command
+				debugPrintf("\b\x1B[K%s%s", prompt, command);
+				break;
+			case CHAR_DOWN:
+				if (!arg4) { // see at declarations
+					break;
+				}
+
+				if (cursor_row >= 0) {
+					cursor_row--;
+				}
+
+				if (cursor_row >=0) {
+					// fill current command from commandline buffers
+					command_column = command;
+					for (char *tmp = cmdline_buffers[cursor_row]; *tmp; command_column++, tmp++) {
+						*(command_column) = *(tmp);
+					}
+					command_column--;
+
+					// count 'new' comand length
+					cursor_column = (uint32_t)(command_column - command);
+					screen_last_char = cursor_column;
+
+					// display 'new' command
+					debugPrintf("\b\x1B[K%s%s", prompt, command);
+					break;
+				}
+				// fallthrough
+			case CHAR_DEL_LINE:
+				command_column = command;
+				screen_last_char = 0;
+				cursor_column = 0;
+				*command_column = 0;
+				debugPrintf("\r\x1B[K%s", prompt);
+				break;
+			default:
+				break;
+		}
+	} while (ch_type != CHAR_NEW_LINE);
+
+	debugPrintf("\n");
+
+	if ((arg4) && (*command >= ' ')) { // see at declarations
+		uint32_t i;
+
+		// find first empty//different command buffer
+		for (i = 0; i < CMDLINE_BUFFER_COUNT; i++) {
+			if (strcmp(cmdline_buffers[i], command) != 0) {
+				break;
+			}
+		}
+		if (i == 10) {
+			i--;
+		}
+
+		// move old buffers on position up
+		for (; i > 0; i--) {
+			strcpy(cmdline_buffers[i], cmdline_buffers[i - 1]);
+		}
+
+		// put command in first commandline buffer
+		strcpy(cmdline_buffers[0], command);
 	}
 
-#warning TODO
+	return command;
 }
 
 // $28C0
 int32_t cmdGO(void) {
-#warning TODO
+	uint32_t value;
+
+	if (debugStrtoul(&value, 16)) {
+		return -1;
+	}
+
+	debugPrintf("GO %L\n", value);
+
+	// this 32-bit pointer won't work on current 64-bit systems
+	((void (*)(void))(value))();
+
+	return 0;
 }
 
 // $28F6
@@ -1645,7 +1814,11 @@ int32_t cmdLO(void) {
 
 // $2E86
 int32_t cmd_(void) {
-#warning TODO
+	if (is_continue) {
+		return cmdMD();
+	}
+
+	return 0;
 }
 
 // $2E98

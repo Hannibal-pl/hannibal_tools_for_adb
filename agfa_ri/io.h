@@ -264,7 +264,7 @@
 
 // commandline char types
 #define		CHAR_NONE			0
-#define		CHAR_CR				1
+#define		CHAR_NEW_LINE			1
 #define		CHAR_DEL			2
 #define		CHAR_UP				3
 #define		CHAR_DOWN			4
